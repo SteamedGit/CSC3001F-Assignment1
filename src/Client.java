@@ -2,10 +2,12 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.lang.Integer;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.concurrent.*;
 
 
 /**
@@ -13,8 +15,11 @@ import java.util.Date;
  */
 public class Client
 {
+    
     public static void main(String[] args) throws IOException, InterruptedException {
 
+        AtomicBoolean isRegistered = new AtomicBoolean(false);
+        AtomicBoolean isRegisterSocketOpen = new AtomicBoolean(false);
         String otherClients = new String();
 
         if (args.length != 3) {
@@ -22,13 +27,25 @@ public class Client
                 return;
         }
         
-        // get a datagram socket
-        DatagramSocket socket = new DatagramSocket(Integer.parseInt(args[0]));
+        //We cannot proceed until we are registered. If we successfully register than the isRegistered flag will be set to
+        //true by the current RegisterClientThread
+        while(!isRegistered.get()) 
+        {
+            DatagramSocket socket = new DatagramSocket(Integer.parseInt(args[0]));
+            isRegisterSocketOpen.set(true);
+            InetAddress address = InetAddress.getByName(args[2]);
+            System.out.println("Starting new registration thread.");
+            new RegisterClientThread(socket, isRegistered, isRegisterSocketOpen,args[1], address, 4445).start();
+            TimeUnit.SECONDS.sleep(1);
+            socket.close();
+            isRegisterSocketOpen.set(false);
+        }
 
-        //First time running a client we need to register with the server.
         InetAddress address = InetAddress.getByName(args[2]);
+        DatagramSocket socket = new DatagramSocket(Integer.parseInt(args[0]));
         byte[] buf = new byte[1024];
         DatagramPacket packet = new DatagramPacket(buf, buf.length, address, 4445);
+<<<<<<< HEAD
         registerClient(socket, args[1], packet );
 
 
@@ -50,6 +67,11 @@ public class Client
             System.out.println(messageArray[3]);
         }
 
+=======
+        String messageFromServer;
+        String[] messageArray;
+    
+>>>>>>> upstream/main
         
         //Gets the list of all other registered clients.
         //This tells us who we can message.
@@ -103,6 +125,7 @@ public class Client
 
     
     /**
+<<<<<<< HEAD
      * The chat application protocol is not finalized. This request sends the required data to register this client.
      * The header information is embedded into the data that gets turned into buf.
      * This is loosely modelled off of HTTP. Example of this type of request:
@@ -142,6 +165,8 @@ public class Client
 
     
     /**
+=======
+>>>>>>> upstream/main
      * This request asks for a list of all other registered clients from the server.
      * Example of this type of request:
      * 

@@ -57,6 +57,12 @@ public class Check  {
         return value;
     }
 
+    /**
+     * Main method to test that checksum yeilds same results for different input data,
+     * fetched from packets and provided as a String
+     * @param args Defined in print statement
+     * @throws UnknownHostException
+     */
     public static void main(String[] args) throws UnknownHostException{
         if(args.length == 3){
             System.out.println("Checking on DatagramPackets\nSyntax: <host> <data1> <data2>\n"+
