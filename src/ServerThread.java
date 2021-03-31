@@ -45,25 +45,34 @@ public class ServerThread extends Thread {
                 {
                     
                     List<ClientData> result1 = clientData.stream() //check if another client with the same name exists
-                    .filter(a -> a.getName().equals(messageArray[3]))
+                    .filter(a -> a.getName().equals(messageArray[4]))
                     .collect(Collectors.toList());
 
-                    List<ClientData> result2 = clientData.stream() //check if another client with the same inetaddress and port exists
-                    .filter(a -> a.getPort()==packet.getPort())
+                    List<ClientData> result2 = clientData.stream() //check if another client with the same inetaddress and  rport  or sport exists
+                    .filter(a -> a.getReceivingPort()==packet.getPort())
                     .filter(a-> a.getAddress().equals(packet.getAddress()))
                     .collect(Collectors.toList());
+
+                    result2.addAll(clientData.stream()
+                    .filter(a -> a.getSendingPort()==packet.getPort())
+                    .filter(a-> a.getAddress().equals(packet.getAddress()))
+                    .collect(Collectors.toList()));
+
                     if(result1.size() == 0 && result2.size() == 0)
                     {
-                        clientData.add(new ClientData(packet.getAddress(), packet.getPort(), messageArray[3]));
-                        confirmRegister(socket, packet.getAddress(), packet.getPort(), messageArray[3], packet);
-                        System.out.println(">" + messageArray[3]+" is registered.\n");
+                        clientData.add(new ClientData(packet.getAddress(), packet.getPort(), Integer.parseInt(messageArray[3]) ,messageArray[4]));
+                        confirmRegister(socket, packet.getAddress(), packet.getPort(), messageArray[4], packet);
+                        System.out.println(">" + messageArray[4]+" is registered with receiving port " 
+                        + packet.getPort() + " and sending port " + messageArray[3] + "\n");
                     }
                     if(result1.size() >0)
                     {
-                        if(result1.get(0).getAddress().equals(packet.getAddress()) && result1.get(0).getPort() == packet.getPort())
+                        if(result1.get(0).getAddress().equals(packet.getAddress()) 
+                        && result1.get(0).getReceivingPort() == packet.getPort() 
+                        && result1.get(0).getSendingPort() == Integer.parseInt(messageArray[3]))
                         {
                             System.out.println("Already registered as " + result1.get(0).getName());
-                            confirmRegister(socket, packet.getAddress(), packet.getPort(), messageArray[3], packet);
+                            confirmRegister(socket, packet.getAddress(), packet.getPort(), messageArray[4], packet);
                         }
                         else
                         {
@@ -76,9 +85,12 @@ public class ServerThread extends Thread {
                     else if(result2.size() > 0)
                     {
                         
-                        if(!result2.get(0).getName().equals(messageArray[3]))
+                        if(!result2.get(0).getName().equals(messageArray[4]))
                         {
-                            String error = "Someone else is registered at " + result2.get(0).getAddress() + " " + result2.get(0).getPort() + " as " + result2.get(0).getName();
+                            String error = "Someone else is registered at " + result2.get(0).getAddress() 
+                            + " with receiving port " + result2.get(0).getReceivingPort() 
+                            + " and sending port " + result2.get(0).getSendingPort() 
+                            + " as " + result2.get(0).getName();
                             System.out.println(error);
                             badRegister(socket, packet.getAddress(), packet.getPort(), error, packet);
                         }
@@ -90,17 +102,21 @@ public class ServerThread extends Thread {
 
                 else if(messageArray[1].equals("Get-Clients"))
                 {
-                    sendListOfClients(socket, packet.getAddress(), packet.getPort(), messageArray[3], packet, clientData);
+                    ClientData client = clientData.stream()
+                    .filter(a -> a.getName().equals(messageArray[3]))
+                    .collect(Collectors.toList()).get(0);
+                    
+                    sendListOfClients(socket, packet.getAddress(), client.getReceivingPort(), messageArray[3], packet, clientData);
                 }
 
                 else if(messageArray[1].equals("Send-MSG-C")) //TODO: Add confirmation to sender that server received message and get confirmation from recipient of receival
                 {
-                    List<ClientData> result1 = clientData.stream() 
+                    List<ClientData> result1 = clientData.stream() //looking for receipient
                     .filter(a -> a.getName().equals(messageArray[3]))
                     .collect(Collectors.toList());
 
-                    List<ClientData> result2 = clientData.stream() 
-                    .filter(a -> a.getPort()==packet.getPort())
+                    List<ClientData> result2 = clientData.stream() //looking for sender
+                    .filter(a -> a.getSendingPort()==packet.getPort())
                     .filter(a-> a.getAddress().equals(packet.getAddress()))
                     .collect(Collectors.toList());
 
@@ -108,7 +124,11 @@ public class ServerThread extends Thread {
                     if (result1.size()>0 && result2.size()>0)
                     {
                         System.out.println(result1.get(0).getName());
-                        message(socket, result1.get(0).getAddress(), result1.get(0).getPort(), result2.get(0).getName() , messageArray[4], packet);
+                        System.out.println("Sent to address: " + 
+                        result1.get(0).getAddress().toString() + 
+                        " Port: " + Integer.toString(result1.get(0).getReceivingPort()));
+                        message(socket, result1.get(0).getAddress(), result1.get(0).getReceivingPort(), result2.get(0).getName() , messageArray[4], packet);
+                        
                     }
                     
                 }

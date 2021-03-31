@@ -13,15 +13,18 @@ public class RegisterClientThread extends Thread
     protected AtomicBoolean registerFlag; //we use this flag to indicate when we have successfully registered
     protected AtomicBoolean isSocketOpen; //this flag is set by Client's main to indicate when the socket is open
     protected String clientName;
+    protected int sendingPort;
     protected int serverPort;
     protected InetAddress address;
     
-    public RegisterClientThread(DatagramSocket socket, AtomicBoolean isRegistered, AtomicBoolean isSocketOpen,String clientName, InetAddress address, int serverPort) throws IOException
+    public RegisterClientThread(DatagramSocket socket, AtomicBoolean isRegistered, AtomicBoolean isSocketOpen, 
+    String clientName, int sendingPort, InetAddress address, int serverPort) throws IOException
     {
         this.socket = socket;
         this.registerFlag = isRegistered;
         this.isSocketOpen = isSocketOpen;
         this.clientName = clientName;
+        this.sendingPort = sendingPort;
         this.address = address;
         this.serverPort = serverPort;
     }
@@ -32,7 +35,7 @@ public class RegisterClientThread extends Thread
         {
             byte[] buf = new byte[1024];
             DatagramPacket packet = new DatagramPacket(buf, buf.length, address, serverPort);
-            registerClient(socket, clientName, packet);
+            registerClient(socket, sendingPort, clientName, packet);
                 
             //Here we await a response
             buf = new byte[1024];
@@ -77,6 +80,7 @@ public class RegisterClientThread extends Thread
      * ChatTP v1.0
      * Register-Client
      * 29-03-2021 00:30:45
+     * 4447
      * Client 1
      * 
      * The address and port of this client are already contained in the UDP header.
@@ -86,16 +90,17 @@ public class RegisterClientThread extends Thread
      * @param packet
      * @throws IOException
      */
-    private static void registerClient(DatagramSocket socket, String clientName, DatagramPacket packet) throws IOException
+    private static void registerClient(DatagramSocket socket, int sendingPort,String clientName, DatagramPacket packet) throws IOException
     {
         String chatProtocolVersion = "ChatTP v1.0\n";
         String chatRequestType = "Register-Client\n";
         DateFormat df = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
         String chatDate = df.format(new Date()) + "\n";
         //Add hash...
+        String sPort = Integer.toString(sendingPort) + "\n";
         String body = clientName + "\n";
 
-        String msg = chatProtocolVersion + chatRequestType + chatDate + body;
+        String msg = chatProtocolVersion + chatRequestType + chatDate + sPort + body;
         byte[] buf = new byte[1024];
         buf = msg.getBytes();
         packet.setData(buf);

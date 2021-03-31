@@ -35,38 +35,37 @@ public class Client
             isRegisterSocketOpen.set(true);
             InetAddress address = InetAddress.getByName(args[2]);
             System.out.println("Starting new registration thread.");
-            new RegisterClientThread(socket, isRegistered, isRegisterSocketOpen,args[1], address, 4445).start();
+            new RegisterClientThread(socket, isRegistered, isRegisterSocketOpen, args[1], Integer.parseInt(args[0])+1, address, 4445).start();
             TimeUnit.SECONDS.sleep(1);
             socket.close();
             isRegisterSocketOpen.set(false);
         }
 
-        InetAddress address = InetAddress.getByName(args[2]);
-        DatagramSocket socket = new DatagramSocket(Integer.parseInt(args[0]));
+        InetAddress address = InetAddress.getByName(args[2] );
+        DatagramSocket socket = new DatagramSocket(Integer.parseInt(args[0])+1);
         byte[] buf = new byte[1024];
         DatagramPacket packet = new DatagramPacket(buf, buf.length, address, 4445);
-        String messageFromServer;
         String[] messageArray;
+        ReceiverClientThread rThread = new ReceiverClientThread(Integer.parseInt(args[0]));
+        rThread.start();
     
         
         //Gets the list of all other registered clients.
         //This tells us who we can message.
         getOtherClients(socket, args[1], packet);
-
-        buf = new byte[1024];
-        packet = new DatagramPacket(buf, buf.length);
-        socket.receive(packet);
-
-        String received = new String(packet.getData(), packet.getOffset(), packet.getLength());
-        otherClients = received.split("\n")[3];
-        System.out.println("Available Clients: " + otherClients);
+        TimeUnit.SECONDS.sleep(1);
+        while(!rThread.messagesFromServer.isEmpty())
+        {
+            messageArray = rThread.messagesFromServer.poll();
+            System.out.println("Available Clients: " + messageArray[3]);
+        }
 
 
         //Send and Receive Messages
         Scanner input = new Scanner(System.in);
         while(true)
         {
-            System.out.println("Do you want to send a message(S) or receive a message(R) or quit?(Q)");
+            System.out.println("Do you want to send a message(S) or quit?(Q)");
             String sRQuit = input.nextLine();
             System.out.println("");
             if(sRQuit.toLowerCase().equals("s"))
@@ -78,19 +77,18 @@ public class Client
                 String text = input.nextLine();
                 System.out.println("");
                 sendMessage(socket, recipient, text, packet);
-                continue;
+                //continue;
             }
             if(sRQuit.toLowerCase().equals("quit") || sRQuit.toLowerCase().equals("q") )
             {
                 break;
             }
-            buf = new byte[1024];
-            packet = new DatagramPacket(buf, buf.length);
-            socket.receive(packet);
-            messageFromServer = new String(packet.getData(), packet.getOffset(), packet.getLength());
-            messageArray = messageFromServer.split("\n");
-            System.out.println("Message from " + messageArray[3] + ":");
-            System.out.println(messageArray[4]+"\n");
+            while(!rThread.messagesFromServer.isEmpty()) //this is how we see all the messages we have been sent
+            {
+                messageArray = rThread.messagesFromServer.poll();
+                System.out.println("Message from " + messageArray[3] + ":");
+                System.out.println(messageArray[4]+"\n");
+            }
         }
       
       
