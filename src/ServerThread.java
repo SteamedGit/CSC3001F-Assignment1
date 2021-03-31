@@ -5,6 +5,7 @@ import java.lang.Integer;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.stream.Collectors;
+import java.util.concurrent.TimeUnit;
  
 /**
  * Defines the server thread.
@@ -20,7 +21,7 @@ public class ServerThread extends Thread {
     this("ServerThread");
     }
  
-    public ServerThread(String name) throws IOException {
+    public ServerThread(String name) throws IOException{
         super(name);
         socket = new DatagramSocket(4445);
  
@@ -42,6 +43,7 @@ public class ServerThread extends Thread {
 
                 if (messageArray[1].equals("Register-Client"))
                 {
+                    
                     List<ClientData> result1 = clientData.stream() //check if another client with the same name exists
                     .filter(a -> a.getName().equals(messageArray[3]))
                     .collect(Collectors.toList());
