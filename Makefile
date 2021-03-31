@@ -12,8 +12,7 @@ CLASS_FILES=$(CLASSES:%.class=$(BINDIR)/%.class)
 default: $(CLASS_FILES)
 clean:
 	rm $(BINDIR)/*.class
-
-run:
-	java -cp bin FindBasin "data/large_in.txt" "test.txt" "sFind" "pExtract"
+server:
+	java -cp bin Server
 docs:
 	javadoc -d $(DOCDIR) src/*.java 

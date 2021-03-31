@@ -48,6 +48,7 @@ public class Client
         {
             System.out.println("Please Re-register: ");
             System.out.println(messageArray[3]);
+            System.exit(0);
         }
 
         
