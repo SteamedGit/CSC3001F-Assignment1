@@ -36,7 +36,7 @@ public class Client
         //Maybe resend the register client if there has no server response. We cannot proceed without being registered
         buf = new byte[1024];
         packet = new DatagramPacket(buf, buf.length);
-        socket.receive(packet);
+        socket.receive(packet); //blocks until something is recieved
         String messageFromServer = new String(packet.getData(), packet.getOffset(), packet.getLength());
         String[] messageArray = messageFromServer.split("\n");
         
@@ -125,12 +125,16 @@ public class Client
         String chatRequestType = "Register-Client\n";
         DateFormat df = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
         String chatDate = df.format(new Date()) + "\n";
-        //Add hash...
+        //TODO Add hash...
+        //Checksum for clientside
+        Check check = new Check(packet);
+        System.out.println("Clientside checksum: "+check.Checksum());
+
         String body = clientName + "\n";
 
         String msg = chatProtocolVersion + chatRequestType + chatDate + body;
         byte[] buf = new byte[1024];
-        buf = msg.getBytes();
+        buf = msg.getBytes();//converts message to bytes
         packet.setData(buf);
         
         socket.send(packet);
