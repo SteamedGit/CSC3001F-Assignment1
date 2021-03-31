@@ -71,7 +71,7 @@ public class Check  {
         else{
             result = false;
         }
-        return result.
+        return result;
     }
 
     public long getValue(){
