@@ -30,20 +30,35 @@ public class Check  {
         buffer = packet.getData();
         bais = new ByteArrayInputStream(buffer);
         cis = new CheckedInputStream(bais, new Adler32());
+    }
 
+    /**
+     * Creates a checksum object using a buffer.
+     * @param b Input buffer.
+     */
+    public Check (byte[] b){
+        buffer = b;
+        bais = new ByteArrayInputStream(buffer);
+        cis = new CheckedInputStream(bais, new Adler32());
     }
     /**
      * Creates an object allowing for a Checksum number to be 
      * generated using contained data.
      * @param s String data to be checked
      */
-    public Check (String s){ //TODO: This doesn't work, only returns checksum of 1
+    public Check (String s){ 
         buffer = s.getBytes();
         bais = new ByteArrayInputStream(buffer);
         cis = new CheckedInputStream(bais, new Adler32());
 
     }
 
+
+
+    /**
+     * Calculates a checksum value on calling Check object.
+     * @return A long value of this object's Checksum.
+     */
     public long Checksum(){
         byte[] readBuffer = new byte[buffer.length];
         try{
@@ -60,6 +75,8 @@ public class Check  {
     /**
      * Sees if calling Checksum is equal to passed Checksum
      * based on their Checksum value.
+     * Use the String class' equals method to check
+     * value pulled from a DatagramPacket's message.
      * @param c a Check object to be compared.
      * @return True if equal, false if not.
      */
@@ -79,6 +96,16 @@ public class Check  {
     }
 
     /**
+     * For comparing one Checksum against another Checksum.
+     * 
+     * @param s
+     * @return
+     */
+    public boolean equals(String s1, String s2){
+
+    }
+
+    /**
      * Main method to test that passed objects/parameters 
      * yeild correct answers where applicable.
      * Tested with DatagramPackets and Strings.
@@ -93,8 +120,6 @@ public class Check  {
             DatagramPacket packet1 = new DatagramPacket(args[1].getBytes(), args[1].getBytes().length, address, 4446);
             DatagramPacket packet2 = new DatagramPacket(args[2].getBytes(), args[2].getBytes().length, address, 4447);
             
-            //Bytes part works, the converting into a checksum number doesn't, only returns 1.
-
             Check check1 = new Check(packet1);
             Check check2 = new Check(packet2);
             long checksum1 = check1.Checksum();

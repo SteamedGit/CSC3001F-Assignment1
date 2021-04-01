@@ -105,6 +105,7 @@ public class Client
      * ChatTP v1.0
      * List-Clients
      * 29-03-2021 00:30:45
+     * (Checksum)
      * Client 2
      * 
      * @param socket
@@ -118,14 +119,21 @@ public class Client
         String chatRequestType = "Get-Clients\n";
         DateFormat df = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
         String chatDate = df.format(new Date()) + "\n";
-        //Add hash...
         String body = clientName + "\n";
 
         String msg = chatProtocolVersion + chatRequestType + chatDate + body;
         byte[] buf = new byte[1024];
         buf = msg.getBytes();
-        packet.setData(buf);
-        
+
+        //Checksum number generated on current buffer state, added in correct place
+        Check check = new Check(buf);
+        long checksum = check.Checksum();//returns checksum as a long
+
+        //redoing the message, now including the checksum
+        msg = chatProtocolVersion + chatRequestType + chatDate + checksum + body; //rewrites message w/ checksum
+        buf = msg.getBytes();
+
+        packet.setData(buf); //new data is set, including the checksum value        
         socket.send(packet);
 
     }
@@ -137,6 +145,7 @@ public class Client
      * ChatTP v1.0
      * Send-MSG-C
      * 29-03-2021 00:30:45
+     * (Checksum)
      * Client 2
      * Hello Client 2!
      * 
@@ -154,14 +163,22 @@ public class Client
         String chatRequestType = "Send-MSG-C\n";
         DateFormat df = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
         String chatDate = df.format(new Date()) + "\n";
-        //Add hash...
         String recip = recipient + "\n";
         String body = text + "\n";
 
-        String msg = chatProtocolVersion + chatRequestType + chatDate + recip + body;
+        String msg = chatProtocolVersion + chatRequestType + chatDate + recip + body; //TODO: Add Checksum
         byte[] buf = new byte[1024];
         buf = msg.getBytes();
-        packet.setData(buf);
+
+        //Checksum number generated on current buffer state, 
+        //checksum number added to msg after calculation on entire buffer
+        Check check = new Check(buf);
+        long checksum = check.Checksum();//returns checksum as a long
+
+        //redoing the message, now including the checksum
+        msg = chatProtocolVersion + chatRequestType + chatDate + checksum + recip + body; //adds it to the end of the message
+        buf = msg.getBytes();
+        packet.setData(buf); //new data is set, including the checksum value
         
         socket.send(packet);
     }

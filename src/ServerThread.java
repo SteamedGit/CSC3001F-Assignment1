@@ -39,7 +39,7 @@ public class ServerThread extends Thread {
  
                 String messageFromClient = new String(packet.getData(), packet.getOffset(), packet.getLength());
                 System.out.println(messageFromClient);
-                String[] messageArray = messageFromClient.split("\n");
+                String[] messageArray = messageFromClient.split("\n"); //last item in messageArray is checksum value
 
                 if (messageArray[1].equals("Register-Client"))
                 {
