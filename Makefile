@@ -7,7 +7,7 @@ DOCDIR=doc
 $(BINDIR)/%.class:$(SRCDIR)/%.java
 	$(JAVAC) -d $(BINDIR)/ -cp $(BINDIR) $<
 
-CLASSES= Check.class ClientData.class RegisterClientThread.class ReceiverClientThread.class ServerThread.class Server.class Client.class
+CLASSES= Check.class Message.class History.class ClientData.class RegisterClientThread.class ReceiverClientThread.class ServerThread.class Server.class Client.class
 CLASS_FILES=$(CLASSES:%.class=$(BINDIR)/%.class)
 default: $(CLASS_FILES)
 clean:

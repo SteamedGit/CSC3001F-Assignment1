@@ -12,6 +12,7 @@ import java.util.concurrent.*;
 
 /**
  * This class defines the functionality of the client.
+ * "4446" "Ali" "localhost" --> Example of a started client.
  */
 public class Client
 {
@@ -21,6 +22,7 @@ public class Client
         AtomicBoolean isRegistered = new AtomicBoolean(false);
         AtomicBoolean isRegisterSocketOpen = new AtomicBoolean(false);
         String otherClients = new String();
+        History history = new History(); //object that updates history
 
         if (args.length != 3) {
                 System.out.println("Usage: java Client <client port> <client name> <hostname>");
@@ -85,12 +87,11 @@ public class Client
 
 
                 Message m = new Message(recipient, args[1], text);    //changed to create object
+                history.update(m); //Updates history for those particular clients
                 m.sendMessage(socket, packet);
                 messageList.add(m);
-
-
                 
-                //continue;
+
             }
             if(sRQuit.toLowerCase().equals("quit") || sRQuit.toLowerCase().equals("q") )
             {
@@ -111,11 +112,12 @@ public class Client
 
                 if (messageArray[1].equals("Send-MSG-SENT-S")){
                     System.out.println("Message has been sent, message id = " + messageArray[4]);
-
+                    
                     for (Message msg : messageList) { 		      
                         if (msg.getId().equals(messageArray[4])){
                             msg.setSent(true);
                             System.out.println("Message FOUND and set to SENT");
+                            
                         }
                    }
 
@@ -131,12 +133,10 @@ public class Client
                             msg.setRecieved(true);
                             msg.setSent(true);
                             System.out.println("Message FOUND and set to  SENT and RECIEVED");
+                            
                         }
                    }
                 }
-
-
-
             }
         }
       
