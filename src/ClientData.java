@@ -5,15 +5,17 @@ import java.net.*;
 public class ClientData
 {
     private InetAddress address;
-    private int port;
+    private int receivingPort;
+    private int sendingPort;
     private String name;
 
     //Maybe all their sent messages?
 
-    public ClientData(InetAddress address, int port, String name)
+    public ClientData(InetAddress address, int receivingPort, int sendingPort, String name)
     {
         this.address = address;
-        this.port = port;
+        this.receivingPort = receivingPort;
+        this.sendingPort = sendingPort;
         this.name = name;
     }
 
@@ -27,8 +29,13 @@ public class ClientData
         return this.name;
     }
 
-    public int getPort()
+    public int getReceivingPort()
     {
-        return this.port;
+        return this.receivingPort;
+    }
+
+    public int getSendingPort()
+    {
+        return this.sendingPort;
     }
 }
