@@ -1,7 +1,7 @@
-import java.io.IOException; 
+import java.io.*;
 
 /**
- * Starts the server thread and creates a file for users' chat history.
+ * Starts the server thread.
  */
 public class Server {
     public static void main(String[] args) throws IOException {

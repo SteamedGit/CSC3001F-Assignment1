@@ -1,108 +1,130 @@
-import java.io.File;  // Import the File class
-import java.io.FileWriter;
-import java.io.IOException;
-import java.net.DatagramPacket;
 import java.util.Collections; 
 import java.util.List;
-import java.util.Scanner;
 import java.util.ArrayList; 
 /**
  * Class for managing and updating successfully sent messages
  * between two clients.
+ * Each History object represents the chat history between
+ * at least two clients.
  */
 public class History {
-    String client1, client2; //clients involved in the chat
-    String fileName;
+    String chatID;
     Message message;
+    List<List<Message>> history; //Mother arraylist storing all chat histories
+    //List<Message> historyForClient; //history for a particular client
+    List<String> indexID; //client ID of those concerned in the chat
+    int index = -1; //index of given ID
+    int numClients = 0; //number of clients belonging to this history object
+    int numMessages = 0;
+
+    /**
+     * Creates a History object.
+     * This object will store the all Messages sent between relative clients
+     * in Message objects passed to this object.
+     */
     public History(){
+        history = new ArrayList<List<Message>>(); //arraylist storing arraylists
+        indexID = new ArrayList<String>();  
     }
 
     /**
-     * Updates the chat history between two clients.  
-     * Lines between chats are delimitered using \n.
-     * Lines of messages are stored using the client's alias followed by a '->' along with the sent message.
+     * Updates the chat history between two clients with given message.  
      * 
-     * Client1Client2 //Index0 for ID
-     * Client1->Hi there! //Chat starts at Index1
      * @param m Sent message
      */
     public void update(Message m){
-        message = m;
-        client1 = m.getSender();
-        client2 = m.getReciever();
+        this.message = m;
+        String client1 = m.getsenderOfOriginalMessage();
+        String client2 = m.getReciever(); 
+        chatID = gen(client1, client2); //generates ID for given message      
+        index = indexID.indexOf(chatID); //finds where in the indexID list this chatID is stored
+        //historyForClient.clear();//make sure it's empty before adding stuff into it for a new chat record
 
-        String fileName = gen(client1, client2);
-
-        try{
-            File file = new File(fileName);
-            
-            if (file.createNewFile()){//if new file is created, we write to that one
-                FileWriter writer = new FileWriter(fileName);
-                writer.write(fileName+"\n"); //Used to identify whose chat we're on - the first line in a chat. Chat starts at index 1.
-                writer.close();
-            }
-            FileWriter writer = new FileWriter(fileName, true);
-            writer.write(client1+ "->"+m.getText()+"\n");//client1 will ALWAYS be the sender, so we only need to add in stuff from their perspective.
-            writer.close();
-            
-        } catch (IOException e){
-            e.printStackTrace();
+        if(index == -1){//then this ID is not in the list
+            indexID.add(chatID);//this ID is added into the index array
+            index = indexID.indexOf(chatID);//calculates new index
+            List<Message> historyForClient = new ArrayList<Message>();
+            historyForClient.add(message); 
+            history.add(index, historyForClient);//adds new message into correct part of mother array
         }
+        else{//ID is in the list
+            List<Message> historyForClient = new ArrayList<Message>();
+            historyForClient = history.get(index); //chat history for these clients fetched
+            historyForClient.add(message); //new message added to this particular hist
 
+            history.add(index, historyForClient);//This new list is appended onto the pre-existing chat history
+            numMessages++;
+        }
     }
 
     /**
      * Fetches chat history for c clients.
      * @param c Variable number of clients.
      */
-    public void fetch(String ... c){
-        String fileName = gen(c);
-        boolean exists = false;
-        File file = new File(fileName);
-        try{
-            if (file.createNewFile()){//if a new file was created, that means there's no history
+    public List<Message> getHistory(String ... c){
+        String[] clients;
+        String allClients = "";
+        int clientCount = 0; //number of clients
+        for(String e: c){
+            allClients = allClients + e +"\n";
+            clientCount++;
+        }
+        clients = allClients.split("\n"); //splits into a list of clients
+        chatID = gen(clients); //chat ID generated with given client names
+        index = -1;
+
+        index = indexID.indexOf(chatID); //looks for this chat ID in the index array
+        List<Message> msg = new ArrayList<Message>(); //stores fetched arraylist from mother array with found index
+        int count = 0; //count number of messages added
+
+            if (history.get(index).isEmpty()){//if the arraylist is empty, then no new chat was added to it
                 System.out.println("No chat history exists for these users.");
-                file.delete(); //deletes file that was made for the testing
+                return null;
             }
-            else{//if a file already exists, we know we can read from it
-                Scanner scFile = new Scanner(file);
-                //TODO: read in textfile, change "->" into ":" and print to terminal
-                while(scFile.hasNextLine()){
-                    String line = scFile.nextLine();
-                    String[] msg = line.split("->");
-                    System.out.println(msg[0] + ": " +msg[1]+"\n"); //Changes format from C1->Hi to C1: Hi
-                }
+            else{//chat history does exist
+                msg = history.get(index);
             }
-
-        }
-        catch(IOException e){
-            e.printStackTrace();
-        }
-
+        return msg;
         
     }
 
     /**
-     * Generates a filename.
+     * Returns a String representing the chat history between the clients
+     * given in the parameter.
+     */
+    public String toString(String ... c){
+        List<Message> hist = getHistory(c); //gets history for these clients
+        String hold = "";
+        for(Message m: hist){
+            hold = hold + m.getsenderOfOriginalMessage() +": "+m.getText()+"\n";//adds the text into this string, separated by \n
+        }
+        return hold;
+    }
+
+    /**
+     * Generates an ID used to determine if the current ArrayList is
+     * for the correct clients or not.
      * @param c ... Accepts a variable number of client names
      */
     public String gen(String ... c){
         List <String> clientList = new ArrayList<String>();
-        int count = 0;
-        String fileName = "";
+        String chatID = "";
 
         //loading all clients into a list
         for(String item: c){
             clientList.add(item);
-            count ++;
+            numClients ++;
         }
 
         Collections.sort(clientList); //Sorts client names in ascending order to match filename
         for(String item: clientList){
-            fileName = ""+ fileName + item;
+            chatID = ""+ chatID + item;
         }
 
-        fileName = fileName+".txt";
-        return fileName;
+        return chatID;
+    }
+
+    public int getNumClients(){
+        return numClients;
     }
 }

@@ -35,7 +35,7 @@ public class RegisterClientThread extends Thread
         {
             byte[] buf = new byte[1024];
             DatagramPacket packet = new DatagramPacket(buf, buf.length, address, serverPort);
-            registerClient(socket, sendingPort, clientName, packet);
+            Message.registerClient(socket, sendingPort, clientName, packet);
                 
             //Here we await a response
             buf = new byte[1024];
@@ -70,41 +70,4 @@ public class RegisterClientThread extends Thread
         }
     }
 
-
-
-       /**
-     * The chat application protocol is not finalized. This request sends the required data to register this client.
-     * The header information is embedded into the data that gets turned into buf.
-     * This is loosely modelled off of HTTP. Example of this type of request:
-     * 
-     * ChatTP v1.0
-     * Register-Client
-     * 29-03-2021 00:30:45
-     * 4447
-     * Client 1
-     * 
-     * The address and port of this client are already contained in the UDP header.
-     * 
-     * @param socket
-     * @param clientName
-     * @param packet
-     * @throws IOException
-     */
-    private static void registerClient(DatagramSocket socket, int sendingPort,String clientName, DatagramPacket packet) throws IOException
-    {
-        String chatProtocolVersion = "ChatTP v1.0\n";
-        String chatRequestType = "Register-Client\n";
-        DateFormat df = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-        String chatDate = df.format(new Date()) + "\n";
-        //Add hash...
-        String sPort = Integer.toString(sendingPort) + "\n";
-        String body = clientName + "\n";
-
-        String msg = chatProtocolVersion + chatRequestType + chatDate + sPort + body;
-        byte[] buf = new byte[1024];
-        buf = msg.getBytes();
-        packet.setData(buf);
-        
-        socket.send(packet);
-    }
 }
