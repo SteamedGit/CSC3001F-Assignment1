@@ -1,13 +1,16 @@
-import java.io.*;
-import java.net.*;
-import java.util.*;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.lang.Integer;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 
 /**
@@ -15,155 +18,252 @@ import java.util.concurrent.*;
  */
 public class Client
 {
-    
-    public static void main(String[] args) throws IOException, InterruptedException {
+    String port, name, hostname;
 
-        AtomicBoolean isRegistered = new AtomicBoolean(false);
-        AtomicBoolean isRegisterSocketOpen = new AtomicBoolean(false);
-        String otherClients = new String();
+    AtomicBoolean isRegistered;
+    AtomicBoolean isRegisterSocketOpen;
+    AtomicInteger numberOfSentMessages;
+    Map<Long, Message> messagesReceivedFromServer;
+    Map<Long, Message> messagesSentFromClient;
+    Map<Long, Message> specialRequestsSentFromClient;
+    String otherClients;
 
-        if (args.length != 3) {
-                System.out.println("Usage: java Client <client port> <client name> <hostname>");
-                return;
-        }
+    DatagramSocket socket;
+    InetAddress address;
+    byte[] buf;
+    DatagramPacket packet;
+    String[] messageArray;
+    ReceiverClientThread rThread;
+    History clientHistory;
+
+    public Client(String port, String name, String hostname) throws NumberFormatException, IOException, InterruptedException{
+        this.port = port;
+        this.name = name;
+        this.hostname = hostname;
+
+        this.clientHistory = new History();
+        this.isRegistered = new AtomicBoolean(false);
+        this.isRegisterSocketOpen = new AtomicBoolean(false);
+        this.numberOfSentMessages = new AtomicInteger(0);
+
+
+       this.messagesReceivedFromServer = new HashMap<Long, Message>();
+       this.messagesSentFromClient = new HashMap<Long, Message>();
+       this.specialRequestsSentFromClient = new HashMap<Long, Message>();
+        
+        this.otherClients = new String();
         
         //We cannot proceed until we are registered. If we successfully register than the isRegistered flag will be set to
         //true by the current RegisterClientThread
-        while(!isRegistered.get()) 
+        while(!isRegistered.get())  //sometimes throwing errors now. maybe wait longer
         {
-            DatagramSocket socket = new DatagramSocket(Integer.parseInt(args[0]));
-            isRegisterSocketOpen.set(true);
-            InetAddress address = InetAddress.getByName(args[2]);
+            this.socket = new DatagramSocket(Integer.parseInt(this.port));
+            this.isRegisterSocketOpen.set(true);
+            this.address = InetAddress.getByName(this.hostname);
             System.out.println("Starting new registration thread.");
-            new RegisterClientThread(socket, isRegistered, isRegisterSocketOpen, args[1], Integer.parseInt(args[0])+1, address, 4445).start();
-            TimeUnit.SECONDS.sleep(1);
-            socket.close();
-            isRegisterSocketOpen.set(false);
+            new RegisterClientThread(this.socket, this.isRegistered, this.isRegisterSocketOpen, this.name, Integer.parseInt(this.port)+1, this.address, 4445).start();
+            TimeUnit.SECONDS.sleep(2);
+            this.socket.close();
+            this.isRegisterSocketOpen.set(false);
         }
 
-        InetAddress address = InetAddress.getByName(args[2] );
-        DatagramSocket socket = new DatagramSocket(Integer.parseInt(args[0])+1);
-        byte[] buf = new byte[1024];
-        DatagramPacket packet = new DatagramPacket(buf, buf.length, address, 4445);
-        String[] messageArray;
-        ReceiverClientThread rThread = new ReceiverClientThread(Integer.parseInt(args[0]));
-        rThread.start();
-    
+        this.address = InetAddress.getByName(this.hostname );
+        this.socket = new DatagramSocket(Integer.parseInt(port)+1);
+        this.buf = new byte[1024];
+        this.packet = new DatagramPacket(this.buf, this.buf.length, this.address, 4445);
         
-        //Gets the list of all other registered clients.
+        this.rThread = new ReceiverClientThread(Integer.parseInt(this.port));
+        this.rThread.start();
+
+
+    }
+
+
+    public  String getOtherClients() throws IOException, InterruptedException{
+                //Gets the list of all other registered clients.
         //This tells us who we can message.
-        getOtherClients(socket, args[1], packet);
+        String getClientsDetails[] = Message.getOtherClients(this.socket, this.name, this.packet, this.rThread.numberOfReceivedMessages.get(), 
+        this.numberOfSentMessages.incrementAndGet());
+        Message msgGetClients = new Message(getClientsDetails, Message.REQUEST_GET_CLIENTS, this.name, "Server");
+        this.specialRequestsSentFromClient.put(msgGetClients.getCheckSum(), msgGetClients); 
+        //need to add every getClients call to this to the special message list in case its not sent or data corrupted
         TimeUnit.SECONDS.sleep(1);
-        while(!rThread.messagesFromServer.isEmpty())
-        {
-            messageArray = rThread.messagesFromServer.poll();
-            System.out.println("Available Clients: " + messageArray[3]);
-        }
+        return recieveMessage();
+    }
 
 
-        //Send and Receive Messages
-        Scanner input = new Scanner(System.in);
-        while(true)
+
+
+    public void sendMessage(String recipient, String text) throws IOException {
+            //Send and Receive Messages
+
+            Message msgC = new Message(recipient, this.name, text);
+            msgC.sendMessageC(this.socket, this.packet, this.rThread.numberOfReceivedMessages.get(), this.numberOfSentMessages.incrementAndGet());
+            this.messagesSentFromClient.put(msgC.getCheckSum(), msgC);
+            System.out.println("Checksum of sent msg: " + msgC.getCheckSum() + " timestamp " + msgC.getTimestamp() + " text: " + msgC.getText());
+                //continue;
+            this.clientHistory.update(msgC);
+        }    
+
+
+    public String getHistory(String otherClient){
+
+        return this.clientHistory.toString(this.name, otherClient);
+
+    }
+
+    
+
+
+
+
+
+    public String recieveMessage() throws IOException
+    {
+
+        
+
+        String returnedMessage = "";
+        String returnClients = "";
+        while(!this.rThread.messagesFromServer.isEmpty())  //this is how we see all the messages we have been sent
         {
-            System.out.println("Do you want to send a message(S) or quit?(Q)");
-            String sRQuit = input.nextLine();
-            System.out.println("");
-            if(sRQuit.toLowerCase().equals("s"))
+            this.messageArray = this.rThread.messagesFromServer.poll();               
+            
+            System.out.println("Message from server: " + this.messageArray[1]);
+            returnedMessage += "Message from server: " + this.messageArray[1] + '\n';
+
+            if (this.messageArray[1].equals("Send-MSG-S"))
+            {
+            
+                System.out.println("Message from " + this.messageArray[4] + ":");
+                System.out.println(this.messageArray[7]+"\n");
+                returnedMessage += "Message from " + this.messageArray[4] + ":" + this.messageArray[7]+"\n";
+
+                Message msgS = new Message(this.messageArray, Message.RESPONSE_SEND_MESSAGE_SERVER, this.messageArray[4], this.name);
+                msgS.setRecieved("1");
+                msgS.sendMessageReceiptClient(this.socket, this.messageArray[4], this.packet, this.rThread.numberOfReceivedMessages.get(), this.numberOfSentMessages.incrementAndGet());
+                this.messagesReceivedFromServer.put(msgS.getCheckSum(), msgS);
+                this.clientHistory.update(msgS);
+
+            }
+
+            else if (this.messageArray[1].equals("Send-MSG-S-SENT"))
             {
                 
-                System.out.println("Who do you want to send a message to?");
-                String recipient = input.nextLine();
-                System.out.println("What is the message?");
-                String text = input.nextLine();
-                System.out.println("");
-                sendMessage(socket, recipient, text, packet);
-                //continue;
-            }
-            if(sRQuit.toLowerCase().equals("quit") || sRQuit.toLowerCase().equals("q") )
-            {
-                break;
-            }
-            while(!rThread.messagesFromServer.isEmpty()) //this is how we see all the messages we have been sent
-            {
-                messageArray = rThread.messagesFromServer.poll();
-                System.out.println("Message from " + messageArray[3] + ":");
-                System.out.println(messageArray[4]+"\n");
-            }
-        }
-      
-      
+                Message msgSentFromThisClient = this.messagesSentFromClient.get(Long.parseLong(this.messageArray[3]));
+                if ( msgSentFromThisClient != null){
+                    msgSentFromThisClient.setSent(true);
+                    System.out.println("Message has been sent, message timestamp " + this.messageArray[2] + " and checksum " + this.messageArray[3]);
+                    returnedMessage += "Message has been sent, message timestamp " + this.messageArray[2] + " and checksum " + this.messageArray[3] + '\n';
+                    //this.clientHistory.update(msgSentFromThisClient);
+                }
 
-        input.close();
-        socket.close();
+            }
+
+
+            else if (this.messageArray[1].equals("Send-MSG-S-RECEIPT"))
+            {
+                    Message msgSentFromThisClient = this.messagesSentFromClient.get(Long.parseLong(this.messageArray[3])); 		      
+                    if (msgSentFromThisClient!= null){
+                        msgSentFromThisClient.setSent(true);
+                        msgSentFromThisClient.setRecieved("1");
+                        System.out.println("Message " + this.messageArray[3] + " has been received by " + msgSentFromThisClient.getReciever());
+                        returnedMessage  += "Message " + this.messageArray[3] + " has been received by " + msgSentFromThisClient.getReciever();
+                        //this.clientHistory.update(msgSentFromThisClient);
+                    }
+            }
+
+            else if(messageArray[1].equals("Get-Missing-Messages-S"))
+            {
+                
+                
+                System.out.println("Detected missing messages on client side");
+               // System.out.println("Message array[4] is " + messageArray[4]);
+
+                if(messageArray[4] != null && !messageArray[4].isEmpty() && messageArray[4] != "No checksums on server")
+                {
+                    List<Long> receivedChecksums = Arrays.asList(messageArray[4].split("\\s+")).stream()
+                    .map(s -> Long.parseLong(s.trim())).collect(Collectors.toList()); //Checksums now in a list of longs
+                    
+                    List<Long> missingMessageCChecksums = messagesSentFromClient.keySet().stream().filter(c -> !receivedChecksums.contains(c))
+                    .collect(Collectors.toList()); //find messages where this client was the original sender
+
+                    for(Long checkSum : missingMessageCChecksums)
+                    {
+                        messagesSentFromClient.get(checkSum).resendMessageC(socket, packet, rThread.numberOfReceivedMessages.get(), 
+                        numberOfSentMessages.get()); //we're not incrementing our count here, we are trying to 'catch up'.
+
+
+                    }
+                    List<Long> missingMessageRecChecksums = messagesReceivedFromServer.keySet().stream().filter(c -> !receivedChecksums.contains(c))
+                    .collect(Collectors.toList()); //find messages where we didnt send a receipt
+                    for(Long checkSum : missingMessageRecChecksums)
+                    {
+                        messagesReceivedFromServer.get(checkSum).sendMessageReceiptClient(socket, messagesReceivedFromServer.get(checkSum).getsenderOfOriginalMessage(), packet, 
+                        rThread.numberOfReceivedMessages.get(), numberOfSentMessages.get()); //we're not incrementing our count here, we are trying to 'catch up'.
+                    }
+
+                    List<Long> missingSpecialMessageChecksums = specialRequestsSentFromClient.keySet().stream().filter(c -> !receivedChecksums.contains(c))
+                    .collect(Collectors.toList()); //find special messages we didnt send
+                    for(Long checkSum : missingSpecialMessageChecksums)
+                    {
+                        Message specMsg = specialRequestsSentFromClient.get(checkSum);
+                        if(specMsg.getText().equals(Message.REQUEST_GET_CLIENTS))
+                        {
+                            Message.getOtherClients(socket, specMsg.getsenderOfOriginalMessage(), 
+                            specMsg.getTimestamp(), specMsg.getCheckSum(), packet, rThread.numberOfReceivedMessages.get(), 
+                            numberOfSentMessages.get()); //we're not incrementing our count here, we are trying to 'catch up'.
+                        }
+                    }
+                }
+                else
+                {
+                    for(Message msgC : messagesSentFromClient.values())
+                    {
+                        msgC.resendMessageC(socket, packet, rThread.numberOfReceivedMessages.get(), 
+                        numberOfSentMessages.get());
+                    }
+                    for(Message msgRec : messagesReceivedFromServer.values())
+                    {
+                        msgRec.sendMessageReceiptClient(socket, msgRec.getsenderOfOriginalMessage(), packet, 
+                        rThread.numberOfReceivedMessages.get(), numberOfSentMessages.get());
+                    }
+                    for(Message specMsg : specialRequestsSentFromClient.values())
+                    {
+                        if(specMsg.getText().equals(Message.REQUEST_GET_CLIENTS))
+                        {
+                            Message.getOtherClients(socket, specMsg.getsenderOfOriginalMessage(), 
+                            specMsg.getTimestamp(), specMsg.getCheckSum(), packet, rThread.numberOfReceivedMessages.get(), 
+                            numberOfSentMessages.get()); //we're not incrementing our count here, we are trying to 'catch up'.
+                        }
+                    }
+                }
+            
+            }
+            else if(messageArray[1].equals("List-Of-Clients"))
+            {
+                //returnedMessage = messageArray[3];
+                returnClients = messageArray[3];
+            }
+
+            
+        }
+        return returnClients;
+        //System.out.println(this.name +" has received: " +this.rThread.numberOfReceivedMessages.get());
+        //returnedMessage += this.name +" has received: " +this.rThread.numberOfReceivedMessages.get();
     }
+
+
 
     
-    /**
-     * This request asks for a list of all other registered clients from the server.
-     * Example of this type of request:
-     * 
-     * ChatTP v1.0
-     * List-Clients
-     * 29-03-2021 00:30:45
-     * Client 2
-     * 
-     * @param socket
-     * @param clientName
-     * @param packet
-     * @throws IOException
-     */
-    private static void getOtherClients(DatagramSocket socket, String clientName, DatagramPacket packet) throws IOException
-    {
-        String chatProtocolVersion = "ChatTP v1.0\n";
-        String chatRequestType = "Get-Clients\n";
-        DateFormat df = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-        String chatDate = df.format(new Date()) + "\n";
-        //Add hash...
-        String body = clientName + "\n";
 
-        String msg = chatProtocolVersion + chatRequestType + chatDate + body;
-        byte[] buf = new byte[1024];
-        buf = msg.getBytes();
-        packet.setData(buf);
-        
-        socket.send(packet);
 
+
+
+    public void quit() {
+
+        this.socket.close();
     }
 
-    /**
-     * Sends message for another client to the server. The server will pass the message on to the intended recipient.
-     * Example:
-     * 
-     * ChatTP v1.0
-     * Send-MSG-C
-     * 29-03-2021 00:30:45
-     * Client 2
-     * Hello Client 2!
-     * 
-     * 
-     * 
-     * @param socket
-     * @param recipient
-     * @param text
-     * @param packet
-     * @throws IOException
-     */
-    private static void sendMessage(DatagramSocket socket, String recipient, String text, DatagramPacket packet) throws IOException
-    {
-        String chatProtocolVersion = "ChatTP v1.0\n";
-        String chatRequestType = "Send-MSG-C\n";
-        DateFormat df = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-        String chatDate = df.format(new Date()) + "\n";
-        //Add hash...
-        String recip = recipient + "\n";
-        String body = text + "\n";
-
-        String msg = chatProtocolVersion + chatRequestType + chatDate + recip + body;
-        byte[] buf = new byte[1024];
-        buf = msg.getBytes();
-        packet.setData(buf);
-        
-        socket.send(packet);
-    }
 
 }
